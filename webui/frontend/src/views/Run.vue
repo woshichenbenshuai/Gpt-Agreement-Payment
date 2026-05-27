@@ -321,9 +321,9 @@
             <TermToggle v-model="form.register_only" :disabled="form.pay_only">--register-only</TermToggle>
           </div>
           <p v-if="showRunModifiers" class="ctl-hint">
-            <code>--pay-only</code> Skip registration, prefer reusing recently registered but unpaid accounts;
-            <code>--register-only</code> Register only, no payment.
-            <span v-if="form.register_only">Currently register-only; payment method config hidden.</span>
+            <code>--pay-only</code> 跳过注册，优先复用已注册但未支付账号；
+            <code>--register-only</code> 只注册 GPT，不支付。
+            <span v-if="form.register_only">当前是只注册模式，支付配置已隐藏。</span>
           </p>
 
           <div v-if="showRegisterPath" class="ctl-row reg-mode">
@@ -356,19 +356,19 @@
             </label>
             <label class="reg-mode-opt" :class="{ active: form.mail_source === 'manual' }">
               <input type="radio" value="manual" v-model="form.mail_source" />
-              Manual Email + OTP
+              手动邮箱 + 验证码
             </label>
           </div>
           <div v-if="showManualEmailSelector" class="ctl-row sub">
             <TermField
               v-model="form.manual_email"
-              label="Manual Email"
+              label="手动邮箱"
               placeholder="you@example.com"
             />
           </div>
           <p v-if="showManualEmailSelector" class="ctl-hint">
-            The registration flow will use this exact email. When OpenAI sends the email code,
-            WebUI opens the OTP modal; type the code manually to continue.
+            注册流程会使用这个邮箱。OpenAI 发出邮箱验证码后，WebUI 会弹出验证码输入框；
+            手动填入验证码后流程继续。
           </p>
           <div v-if="showOutlookSelector" class="ctl-row reg-mode">
             <span class="reg-mode-label">Outlook Account ·</span>
@@ -805,9 +805,9 @@
               @click="dismissOtpModal"
             >×</button>
             <div class="otp-head">
-              <span class="otp-prompt">$</span> OTP Required
+              <span class="otp-prompt">$</span> 需要验证码
             </div>
-            <p class="otp-desc">Enter the code just received by WhatsApp or email. Submit and the running flow continues automatically.</p>
+            <p class="otp-desc">请输入刚收到的 WhatsApp 或邮箱验证码，提交后当前流程会自动继续。</p>
             <input
               class="otp-input"
               v-model="otpDialog.value"
@@ -864,7 +864,7 @@ const dialog = useDialog();
 const modes = [
   { value: "single", label: "single — 1×" },
   { value: "batch", label: "batch — N×" },
-  { value: "register_only", label: "register-only - GPT only" },
+  { value: "register_only", label: "只注册 GPT" },
   { value: "self_dealer", label: "self-dealer" },
   { value: "daemon", label: "daemon ∞" },
   { value: "free_register", label: "free_register — free accounts+rt+CPA" },

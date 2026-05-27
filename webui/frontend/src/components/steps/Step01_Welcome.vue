@@ -24,7 +24,7 @@ const mode = ref(store.answers.mode?.mode ?? "single");
 const payment = ref(store.answers.payment?.method ?? "both");
 
 const modeOptions = [
-  { value: "register_only", label: "register_only - GPT only", desc: "Only register a GPT account and stop before payment/OAuth RT" },
+  { value: "register_only", label: "只注册 GPT", desc: "只注册 ChatGPT 账号，成功后停止，不进入支付和 OAuth RT 流程" },
   { value: "single", label: "single — 1×", desc: "Single: Register one account + pay once" },
   { value: "batch", label: "batch — N×", desc: "Batch: Loop run N pipelines" },
   { value: "self_dealer", label: "self_dealer — 1+N", desc: "Self-dealing: 1 owner pays + N members onboard" },
