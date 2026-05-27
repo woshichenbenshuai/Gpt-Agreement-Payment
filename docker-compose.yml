@@ -17,8 +17,8 @@ services:
     image: gpt-agreement-payment:local
     container_name: gap-webui
     ports:
-      # By default only exposes 127.0.0.1, use nginx reverse proxy or explicitly change to "0.0.0.0:8317:8765" for public network
-      - "127.0.0.1:8317:8765"
+      # Expose on all host interfaces so remote clients can access the WebUI.
+      - "0.0.0.0:8317:8765"
     volumes:
       # Entire repository bind mount —— host git working tree is SOURCE OF TRUTH,
       # Code changes take effect immediately with docker exec / restart; no need to rebuild.
