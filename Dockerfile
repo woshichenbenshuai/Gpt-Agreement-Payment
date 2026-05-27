@@ -73,9 +73,18 @@ RUN playwright install chromium firefox \
     && camoufox fetch
 
 # gost socks5 relay v3 (webshare uses it, pipeline._ensure_gost_alive auto-starts).
-# Use linux_amd64.tar.gz (GOAMD64=v1) not amd64v3.tar.gz to support older CPUs.
+# Download the binary matching the Docker target architecture; fixed amd64 breaks
+# on arm64 hosts with "Exec format error".
 ARG GOST_VERSION=3.2.6
-RUN curl -fsSL "https://github.com/go-gost/gost/releases/download/v${GOST_VERSION}/gost_${GOST_VERSION}_linux_amd64.tar.gz" \
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH:-amd64}" in \
+        amd64) gost_arch="amd64" ;; \
+        arm64) gost_arch="arm64" ;; \
+        arm/v7) gost_arch="armv7" ;; \
+        *) echo "Unsupported Docker TARGETARCH for gost: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://github.com/go-gost/gost/releases/download/v${GOST_VERSION}/gost_${GOST_VERSION}_linux_${gost_arch}.tar.gz" \
         | tar -xz -C /tmp/ \
     && mv /tmp/gost /usr/local/bin/gost \
     && chmod +x /usr/local/bin/gost \
