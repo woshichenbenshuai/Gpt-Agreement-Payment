@@ -3,7 +3,7 @@
 # Usage:
 #   git clone <repo> && cd Gpt-Agreement-Payment
 #   docker compose up -d --build
-#   Open browser to http://127.0.0.1:8765/  (First time go to /setup to create admin)
+#   Open browser to http://127.0.0.1:8317/  (First time go to /setup to create admin)
 #
 # Config files are automatically bootstrapped by entrypoint from *.example.json, edit on host
 # CTF-pay/config.paypal.json + CTF-reg/config.paypal-proxy.json, then
@@ -17,8 +17,8 @@ services:
     image: gpt-agreement-payment:local
     container_name: gap-webui
     ports:
-      # By default only exposes 127.0.0.1, use nginx reverse proxy or explicitly change to "0.0.0.0:8765:8765" for public network
-      - "127.0.0.1:8765:8765"
+      # By default only exposes 127.0.0.1, use nginx reverse proxy or explicitly change to "0.0.0.0:8317:8765" for public network
+      - "127.0.0.1:8317:8765"
     volumes:
       # Entire repository bind mount —— host git working tree is SOURCE OF TRUTH,
       # Code changes take effect immediately with docker exec / restart; no need to rebuild.
