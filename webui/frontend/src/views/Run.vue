@@ -354,7 +354,22 @@
               <input type="radio" value="catch_all" v-model="form.mail_source" />
               Domain catch-all (CF Email Worker)
             </label>
+            <label class="reg-mode-opt" :class="{ active: form.mail_source === 'manual' }">
+              <input type="radio" value="manual" v-model="form.mail_source" />
+              Manual Email + OTP
+            </label>
           </div>
+          <div v-if="showManualEmailSelector" class="ctl-row sub">
+            <TermField
+              v-model="form.manual_email"
+              label="Manual Email"
+              placeholder="you@example.com"
+            />
+          </div>
+          <p v-if="showManualEmailSelector" class="ctl-hint">
+            The registration flow will use this exact email. When OpenAI sends the email code,
+            WebUI opens the OTP modal; type the code manually to continue.
+          </p>
           <div v-if="showOutlookSelector" class="ctl-row reg-mode">
             <span class="reg-mode-label">Outlook Account ·</span>
             <select v-model="form.outlook_email" class="outlook-select" :disabled="outlookLoading">
@@ -790,9 +805,9 @@
               @click="dismissOtpModal"
             >×</button>
             <div class="otp-head">
-              <span class="otp-prompt">$</span> GoPay WhatsApp OTP
+              <span class="otp-prompt">$</span> OTP Required
             </div>
-            <p class="otp-desc">Check WhatsApp, enter the 6-digit OTP just received. Submit and gopay.py continues automatically.</p>
+            <p class="otp-desc">Enter the code just received by WhatsApp or email. Submit and the running flow continues automatically.</p>
             <input
               class="otp-input"
               v-model="otpDialog.value"
@@ -849,6 +864,7 @@ const dialog = useDialog();
 const modes = [
   { value: "single", label: "single — 1×" },
   { value: "batch", label: "batch — N×" },
+  { value: "register_only", label: "register-only - GPT only" },
   { value: "self_dealer", label: "self-dealer" },
   { value: "daemon", label: "daemon ∞" },
   { value: "free_register", label: "free_register — free accounts+rt+CPA" },
@@ -991,8 +1007,9 @@ const form = ref({
   promo_campaign_id: localStorage.getItem("webui.promo_campaign_id") || "",
   register_mode: ((localStorage.getItem("webui.register_mode") as "browser" | "protocol") || "protocol"),
   // Email source (mutually exclusive), default outlook
-  mail_source: (localStorage.getItem("webui.mail_source") || "outlook") as "outlook" | "catch_all",
+  mail_source: (localStorage.getItem("webui.mail_source") || "outlook") as "outlook" | "catch_all" | "manual",
   outlook_email: "",  // only effective when mail_source=outlook, empty = random from pool
+  manual_email: localStorage.getItem("webui.manual_email") || "",
   // no_card_plus mode (scripts/no_card_paypal_plus.py): promo+PayPal RPA open plus for 0
   no_card_promo_link_id: 0, // 0 = auto pick latest fresh plus link
   no_card_phone: localStorage.getItem("webui.no_card_phone") || "",
@@ -1269,6 +1286,9 @@ watch(() => form.value.mail_source, (v) => {
   try { localStorage.setItem("webui.mail_source", v); } catch {}
   if (v !== "outlook") form.value.outlook_email = "";
   else reloadOutlookPool();
+});
+watch(() => form.value.manual_email, (v) => {
+  try { localStorage.setItem("webui.manual_email", v || ""); } catch {}
 });
 watch(() => form.value.mode, (mode) => {
   if (!paymentModes.has(mode)) {
@@ -1620,6 +1640,7 @@ const showRegisterPath = computed(() => requiresRegistration.value);
 const showMailSource = computed(() => requiresRegistration.value);
 const showOutlookSelector = computed(() => showMailSource.value && form.value.mail_source === "outlook");
 const showCatchAllHint = computed(() => showMailSource.value && form.value.mail_source === "catch_all");
+const showManualEmailSelector = computed(() => showMailSource.value && form.value.mail_source === "manual");
 const showQrisPanel = computed(() => !!(form.value.qris && status.value.qris?.reference));
 const showAutoLoopTools = computed(() =>
   form.value.gopay || form.value.mode === "daemon" || autoLoop.value.running
@@ -2224,9 +2245,19 @@ async function refreshInventory() {
 
 async function refreshPreview() {
   try {
-    const r = await api.post("/run/preview", form.value);
+    const r = await api.post("/run/preview", runPayload());
     cmdPreview.value = r.data.cmd_str;
   } catch {}
+}
+
+function runPayload() {
+  const payload: any = { ...form.value };
+  if (payload.mode === "register_only") {
+    payload.mode = "single";
+    payload.register_only = true;
+    payload.pay_only = false;
+  }
+  return payload;
 }
 
 async function refreshStatus() {
@@ -2240,7 +2271,7 @@ async function checkConfigHealth() {
   if (configHealthLoading.value) return configHealth.value;
   configHealthLoading.value = true;
   try {
-    const r = await api.post<ConfigHealthResponse>("/config/health", form.value);
+    const r = await api.post<ConfigHealthResponse>("/config/health", runPayload());
     configHealth.value = r.data;
     return r.data;
   } catch (e: any) {
@@ -2260,7 +2291,7 @@ async function start() {
       message.error(first?.message || "Config health check did not pass, startup blocked");
       return;
     }
-    await api.post("/run/start", form.value);
+    await api.post("/run/start", runPayload());
     message.success("Started");
     lines.value = [];
     await refreshStatus();

@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 import random
 import time
+from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,7 @@ class MailProvider:
         self.last_persona: Optional[Persona] = None
         # Outlook pool claim saves these three segments, wait_for_otp uses IMAP OAuth2
         self._outlook_creds: Optional[dict] = None  # {email, refresh_token, client_id}
+        self._manual_email: str = ""
 
     @staticmethod
     def _random_name() -> str:
@@ -164,10 +166,24 @@ class MailProvider:
             return self._create_outlook_mailbox(_outlook_email)
         elif _source == "catch_all":
             return self._create_catchall_mailbox()
+        elif _source == "manual":
+            return self._create_manual_mailbox()
         else:
             raise RuntimeError(
-                f"未知 mail source: {_source!r} (合法: outlook / catch_all)"
+                f"未知 mail source: {_source!r} (合法: outlook / catch_all / manual)"
             )
+
+    def _create_manual_mailbox(self) -> str:
+        """Use an operator-provided mailbox; OTP is typed into WebUI at runtime."""
+        import os as _os
+
+        email = (_os.environ.get("WEBUI_MANUAL_EMAIL", "") or "").strip().lower()
+        if not email or "@" not in email:
+            raise RuntimeError("manual mail source requires WEBUI_MANUAL_EMAIL")
+        self._manual_email = email
+        self.last_persona = None
+        logger.info(f"邮箱已创建: {email} | source=manual WebUI email + OTP")
+        return email
 
     def _create_outlook_mailbox(self, target_email: str = "") -> str:
         """Claim one account from Outlook pool. Pool empty / specified account unavailable → raise error, no fallback."""
@@ -251,6 +267,9 @@ class MailProvider:
 
         Raise TimeoutError / RuntimeError on failure; never return None."""
         # Current mailbox from Outlook pool → IMAP OAuth2 fetch (pure protocol, no web fallback)
+        if self._manual_email and self._manual_email.lower() == (email_addr or "").lower():
+            return self._wait_for_manual_otp(email_addr, timeout=timeout, issued_after=issued_after)
+
         creds = self._outlook_creds
         if creds and creds.get("email", "").lower() == (email_addr or "").lower():
             try:
@@ -319,3 +338,33 @@ class MailProvider:
         return provider.wait_for_otp(
             email_addr, timeout=timeout, issued_after=issued_after
         )
+
+    def _wait_for_manual_otp(
+        self,
+        email_addr: str,
+        timeout: int = 120,
+        issued_after: Optional[float] = None,
+    ) -> str:
+        import os as _os
+
+        path = Path(_os.environ.get("WEBUI_MANUAL_OTP_FILE", "") or "/tmp/openai_manual_otp.txt")
+        threshold = (issued_after - 5) if issued_after else (time.time() - 5)
+        deadline = time.time() + int(timeout)
+        logger.info(
+            f"OPENAI_EMAIL_OTP_REQUEST email={email_addr} path={path} timeout={timeout}"
+        )
+        while time.time() < deadline:
+            try:
+                if path.exists() and path.stat().st_mtime >= threshold:
+                    code = path.read_text(encoding="utf-8").strip()
+                    if code:
+                        try:
+                            path.unlink()
+                        except Exception:
+                            pass
+                        logger.info(f"[mail] manual OTP received for {email_addr} (len={len(code)})")
+                        return code
+            except Exception as e:
+                logger.warning(f"[mail] manual OTP read failed: {e}")
+            time.sleep(1)
+        raise TimeoutError(f"manual OTP timeout for {email_addr}")

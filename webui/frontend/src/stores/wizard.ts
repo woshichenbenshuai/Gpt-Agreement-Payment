@@ -47,8 +47,8 @@ export const useWizardStore = defineStore("wizard", {
     },
     isStepHidden(n: number): boolean {
       const mm = (this.answers.mode as any)?.mode ?? "single";
-      // free_register / free_backfill_rt does not require payment, steps 6(PayPal/GoPay)/7(Card)/13(Stripe runtime) are all hidden
-      if (mm === "free_register" || mm === "free_backfill_rt") {
+      // register-only / free modes do not require payment, so hide payment/runtime steps.
+      if (mm === "register_only" || mm === "free_register" || mm === "free_backfill_rt") {
         if (n === 6) return true;
         if (n === 7) return true;
         if (n === 13) return true;

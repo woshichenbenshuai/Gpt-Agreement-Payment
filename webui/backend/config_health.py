@@ -215,6 +215,16 @@ def _check_config_files(checks: list[dict], req: dict) -> tuple[dict, dict, Path
 
 
 def _check_cloudflare_kv(checks: list[dict], req: dict) -> None:
+    if _text(req.get("mail_source")) == "manual":
+        _check(
+            checks,
+            "cloudflare_kv_secrets",
+            "ok",
+            "手动邮箱验证码模式不需要 Cloudflare KV",
+            blocking=False,
+        )
+        return
+
     presence = _effective_cloudflare_secret_presence()
     missing = [name for name, ok in presence.items() if not ok]
     if not missing:
@@ -252,6 +262,26 @@ def _check_cloudflare_kv(checks: list[dict], req: dict) -> None:
 def _check_registration_config(checks: list[dict], req: dict, reg_cfg: dict) -> None:
     if not _requires_registration(req):
         return
+    if _text(req.get("mail_source")) == "manual":
+        if _is_missing(req.get("manual_email"), allow_example=True) or "@" not in _text(req.get("manual_email")):
+            _check(
+                checks,
+                "manual_email",
+                "fail",
+                "手动邮箱模式需要填写邮箱地址",
+                missing=["manual_email"],
+                action="在 Run 页 Email Source 选择 Manual Email 后填写可收 OpenAI 验证码的邮箱",
+            )
+        else:
+            _check(
+                checks,
+                "manual_email",
+                "ok",
+                "手动邮箱地址已填写；验证码将在运行时弹窗输入",
+                blocking=False,
+            )
+        return
+
     mail = reg_cfg.get("mail") if isinstance(reg_cfg.get("mail"), dict) else {}
     domains = mail.get("catch_all_domains")
     has_domain = False

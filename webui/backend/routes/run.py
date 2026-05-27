@@ -34,9 +34,11 @@ class StartRequest(BaseModel):
     # Email source (choose one, strictly mutually exclusive, no fallback):
     # - outlook   : Outlook OTP pool (4-segment format import to /outlook page), IMAP OAuth2 receive OTP
     # - catch_all : self-owned domain catch-all + CF Email Worker → KV receive OTP, persona algorithm generate alias
-    mail_source: str = Field(default="outlook", pattern="^(outlook|catch_all)$")
+    mail_source: str = Field(default="outlook", pattern="^(outlook|catch_all|manual)$")
     # Only effective when mail_source=outlook, empty = random pick from pool, specific email = designated
     outlook_email: str = ""
+    # Only effective when mail_source=manual; OTP is typed in the Run page modal.
+    manual_email: str = ""
     # no_card_plus mode: call scripts/no_card_paypal_plus.py use Chromium RPA to open PayPal Plus for 0 yuan
     no_card_promo_link_id: int = 0  # 0 = auto pick the latest fresh plus link
     no_card_phone: str = ""

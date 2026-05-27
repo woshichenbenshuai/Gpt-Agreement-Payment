@@ -236,6 +236,7 @@ def start(*, mode: str, paypal: bool = True, batch: int = 0, workers: int = 3,
           env_overrides: Optional[dict] = None,
           target_emails: Optional[list] = None, rt_only: bool = False,
           mail_source: str = "outlook", outlook_email: str = "",
+          manual_email: str = "",
           # no_card_plus parameter
           no_card_promo_link_id: int = 0,
           no_card_phone: str = "",
@@ -326,12 +327,28 @@ def start(*, mode: str, paypal: bool = True, batch: int = 0, workers: int = 3,
         env.setdefault("OPENAI_SENTINEL_REQUIRE_QUICKJS", "1")
         # Email source (strict binary choice) → CTF-reg/mail/provider.py:create_mailbox() read
         src = (mail_source or "outlook").strip().lower()
-        env["WEBUI_MAIL_SOURCE"] = "catch_all" if src == "catch_all" else "outlook"
+        if src not in ("outlook", "catch_all", "manual"):
+            src = "outlook"
+        env["WEBUI_MAIL_SOURCE"] = src
         env.pop("WEBUI_MAIL_MODE", None)  # Remove legacy obfuscation prevention
         if outlook_email and outlook_email.strip() and src == "outlook":
             env["WEBUI_OUTLOOK_EMAIL"] = outlook_email.strip().lower()
         else:
             env.pop("WEBUI_OUTLOOK_EMAIL", None)
+        if src == "manual":
+            if not manual_email.strip():
+                raise RuntimeError("manual email source requires manual_email")
+            otp_path = s.get_data_dir() / "manual_openai_otp.txt"
+            otp_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                otp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            env["WEBUI_MANUAL_EMAIL"] = manual_email.strip().lower()
+            env["WEBUI_MANUAL_OTP_FILE"] = str(otp_path)
+        else:
+            env.pop("WEBUI_MANUAL_EMAIL", None)
+            env.pop("WEBUI_MANUAL_OTP_FILE", None)
         # QRIS demo mode: webui startup sets WEBUI_QRIS_FORCE_MOCK=1 to let qris=true run
         # built-in mock charge (bypass OpenAI/Stripe risk control, demo QR rendering to frontend). Don't set in production.
         if qris and os.getenv("WEBUI_QRIS_FORCE_MOCK", "").strip().lower() in ("1", "true", "yes"):
@@ -404,6 +421,11 @@ def _detect_otp_wait_target(line: str) -> tuple[str, Optional[Path]]:
     # [gopay] waiting WhatsApp OTP from relay: http://127.0.0.1:8765/api/whatsapp/latest-otp?...
     if re.search(r"\[gopay\]\s+waiting WhatsApp OTP from relay:", line):
         return "db", None
+    if "OPENAI_EMAIL_OTP_REQUEST" in line:
+        m = re.search(r"\bpath=(\S+)", line)
+        if m:
+            return "file", Path(m.group(1).strip().strip("'\""))
+        return "file", s.get_data_dir() / "manual_openai_otp.txt"
     return "", None
 
 

@@ -59,9 +59,11 @@ const prettyAll = computed(() => JSON.stringify(store.answers, null, 2));
 const exportCmd = computed(() => {
   if (!result.value) return "";
   const pm = (store.answers.payment as any)?.method ?? "both";
+  const mode = (store.answers.mode as any)?.mode ?? "single";
   const planType = (store.answers.team_plan as any)?.plan_type ?? "team";
   const flags: string[] = [];
-  if (pm === "gopay") flags.push("--gopay");
+  if (mode === "register_only") flags.push("--register-only");
+  else if (pm === "gopay") flags.push("--gopay");
   else if (pm === "paypal" || pm === "both") flags.push("--paypal");
   if (planType === "plus") flags.push("--plan", "plus");
   return `xvfb-run -a python pipeline.py --config ${relPath(result.value.pay_path)} ${flags.join(" ")}`.trim();
